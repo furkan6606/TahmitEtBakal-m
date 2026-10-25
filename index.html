@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Tahmin Et Bakalım - Online Multiplayer</title>
+    
+    <!-- Firebase SDK (v8) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <style>
+        body { 
+            background: radial-gradient(circle at center, #1b1b2f, #0f0f1a); 
+            color: #fff; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            margin: 0; 
+        }
+
+        /* 1. ANA MENÜ */
+        #menuScreen {
+            background: linear-gradient(145deg, #1f1f38, #16162a);
+            padding: 35px;
+            border-radius: 15px;
+            box-shadow: 0 8px 30px rgba(0, 191, 255, 0.2);
+            border: 2px solid rgba(0, 191, 255, 0.3);
+            text-align: center;
+            width: 330px;
+        }
+
+        #menuScreen h2 { 
+            margin-top: 0; 
+            color: #00ffff; 
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+            font-size: 26px;
+        }
+
+        #menuScreen input {
+            width: 100%;
+            padding: 12px;
+            background: #121222;
+            border: 2px solid #3a3a5c;
+            color: #fff;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            outline: none;
+            font-size: 15px;
+            transition: border-color 0.3s;
+        }
+
+        #menuScreen input:focus { border-color: #00ffff; }
+
+        .menu-buttons { display: flex; gap: 10px; }
+        .menu-buttons button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            color: white;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: transform 0.1s, filter 0.2s;
+        }
+
+        .menu-buttons button:hover { filter: brightness(1.15); transform: translateY(-2px); }
+
+        .btn-create { background: linear-gradient(135deg, #2ed573, #26af5f); }
+        .btn-join { background: linear-gradient(135deg, #00bfff, #0088cc); }
+
+        /* 2. BEKLEME LOBİSİ */
+        #lobbyScreen {
+            display: none;
+            background: linear-gradient(145deg, #1f1f38, #16162a);
+            padding: 30px;
+            border-radius: 15px;
+            width: 360px;
+            box-shadow: 0 8px 30px rgba(46, 213, 115, 0.2);
+            border: 2px solid rgba(46, 213, 115, 0.3);
+            text-align: center;
+        }
+
+        #lobbyScreen h3 { color: #2ed573; margin-top: 0; font-size: 22px; text-shadow: 0 0 8px rgba(46, 213, 115, 0.4); }
+
+        .room-code-display {
+            background: #121222;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 17px;
+            color: #ff9f43;
+            margin-bottom: 15px;
+            font-weight: bold;
+            border: 1px dashed #ff9f43;
+        }
+
+        .lobby-settings-box {
+            background: #151528;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: left;
+            font-size: 13px;
+            border: 1px solid #2a2a4a;
+        }
+
+        .lobby-settings-box select {
+            width: 100%;
+            padding: 9px;
+            background: #121222;
+            border: 1px solid #3a3a5c;
+            color: #fff;
+            border-radius: 6px;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            outline: none;
+            font-size: 14px;
+        }
+
+        .lobby-player-list {
+            background: #121222;
+            border-radius: 8px;
+            padding: 10px;
+            height: 120px;
+            overflow-y: auto;
+            text-align: left;
+            margin-bottom: 15px;
+            font-size: 14px;
+            border: 1px solid #2a2a4a;
+        }
+
+        .lobby-player-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 4px;
+            border-bottom: 1px solid #1f1f38;
+        }
+
+        .ready-status-true { color: #2ed573; font-weight: bold; }
+        .ready-status-false { color: #ff4757; }
+
+        .lobby-action-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #ff9f43, #ff7675);
+            border: none;
+            color: white;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: transform 0.1s, filter 0.2s;
+        }
+        .lobby-action-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        /* 3. KELİME SEÇİMİ MODALI */
+        #wordChoiceModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(10, 10, 20, 0.9);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: linear-gradient(145deg, #222244, #181830);
+            padding: 35px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 35px rgba(0, 255, 255, 0.3);
+            width: 320px;
+            border: 2px solid #00ffff;
+        }
+
+        .modal-content h3 { color: #00ffff; margin-top: 0; font-size: 24px; text-shadow: 0 0 10px rgba(0,255,255,0.4); }
+        
+        .word-choice-btn {
+            width: 100%;
+            padding: 14px;
+            margin-top: 12px;
+            background: linear-gradient(135deg, #2ed573, #26af5f);
+            border: none;
+            color: white;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            box-shadow: 0 4px 15px rgba(46, 213, 115, 0.3);
+            transition: transform 0.1s, filter 0.2s;
+        }
+        .word-choice-btn:hover { filter: brightness(1.15); transform: translateY(-2px); }
+        .word-choice-btn:nth-child(2) { background: linear-gradient(135deg, #00bfff, #0088cc); box-shadow: 0 4px 15px rgba(0, 191, 255, 0.3); }
+
+        /* 4. OYUN EKRANI */
+        #gameScreen { display: none; gap: 15px; align-items: center; }
+
+        .scoreboard {
+            width: 210px;
+            background: linear-gradient(145deg, #1f1f38, #16162a);
+            border-radius: 12px;
+            padding: 15px;
+            height: 560px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+            border: 1px solid #2a2a4a;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        .scoreboard h3 {
+            margin-top: 0;
+            font-size: 16px;
+            border-bottom: 2px solid #2a2a4a;
+            padding-bottom: 10px;
+            color: #00ffff;
+            text-align: center;
+        }
+
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #121222;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            border: 1px solid #252540;
+        }
+
+        .player-score { font-weight: bold; color: #2ed573; text-shadow: 0 0 5px rgba(46,213,115,0.3); }
+
+        .game-area { display: flex; flex-direction: column; gap: 10px; }
+
+        .game-status-bar {
+            background: linear-gradient(145deg, #1f1f38, #16162a);
+            padding: 12px 20px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            color: #ff9f43;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+            border: 1px solid #2a2a4a;
+            font-size: 15px;
+            text-shadow: 0 0 8px rgba(255, 159, 67, 0.3);
+        }
+
+        .timer-box {
+            background: #121222;
+            padding: 6px 12px;
+            border-radius: 6px;
+            color: #ff4757;
+            font-size: 14px;
+            border: 1px solid #ff4757;
+            box-shadow: 0 0 10px rgba(255, 71, 87, 0.2);
+        }
+
+        canvas { 
+            background: #ffffff; 
+            border: 4px solid #2a2a4a; 
+            border-radius: 12px; 
+            cursor: crosshair; 
+            display: block; 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+        }
+
+        .tools-panel {
+            background: linear-gradient(145deg, #1f1f38, #16162a);
+            padding: 12px 15px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+            border: 1px solid #2a2a4a;
+        }
+
+        .color-palette { display: flex; gap: 10px; }
+
+        .color-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .color-btn:hover { transform: scale(1.25); box-shadow: 0 0 10px #fff; }
+
+        .tool-group { display: flex; align-items: center; gap: 10px; }
+
+        .eraser-btn {
+            background: linear-gradient(135deg, #ff9f43, #e67e22);
+            color: white;
+            border: none;
+            padding: 7px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 13px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+        }
+        .eraser-btn:hover { filter: brightness(1.1); }
+
+        .clear-btn {
+            background: linear-gradient(135deg, #ff4757, #c0392b);
+            color: white;
+            border: none;
+            padding: 7px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 13px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+        }
+        .clear-btn:hover { filter: brightness(1.1); }
+
+        .chat-container { 
+            width: 280px; 
+            background: linear-gradient(145deg, #1f1f38, #16162a); 
+            border-radius: 12px; 
+            padding: 15px; 
+            display: flex; 
+            flex-direction: column; 
+            height: 560px; 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.5); 
+            border: 1px solid #2a2a4a;
+            box-sizing: border-box;
+        }
+
+        .chat-messages { 
+            flex: 1; 
+            overflow-y: auto; 
+            border-bottom: 2px solid #2a2a4a; 
+            padding-bottom: 10px; 
+            margin-bottom: 10px; 
+            font-size: 14px; 
+        }
+
+        .chat-messages div {
+            padding: 4px 6px;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            background: rgba(255,255,255,0.03);
+        }
+
+        .chat-input-area { display: flex; gap: 8px; }
+
+        .chat-input-area input { 
+            flex: 1; 
+            padding: 10px; 
+            background: #121222; 
+            border: 1px solid #3a3a5c; 
+            color: #fff; 
+            border-radius: 6px; 
+            outline: none; 
+            font-size: 14px;
+        }
+        .chat-input-area input:focus { border-color: #00ffff; }
+
+        .chat-input-area button { 
+            padding: 10px 14px; 
+            background: linear-gradient(135deg, #00bfff, #0088cc); 
+            border: none; 
+            color: #fff; 
+            font-weight: bold; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+        }
+        .chat-input-area button:hover { filter: brightness(1.15); }
+    </style>
+</head>
+<body>
+
+    <!-- KELİME SEÇİMİ MODALI -->
+    <div id="wordChoiceModal">
+        <div class="modal-content">
+            <h3>Kelime Seçimi</h3>
+            <p style="color:#aaa; font-size:13px;">Çizmek istediğin kelimeyi seç:</p>
+            <button class="word-choice-btn" id="wordBtn1" onclick="kelimeyiOnayla(this.innerText)"></button>
+            <button class="word-choice-btn" id="wordBtn2" onclick="kelimeyiOnayla(this.innerText)"></button>
+        </div>
+    </div>
+
+    <!-- 1. ANA MENÜ -->
+    <div id="menuScreen">
+        <h2>Tahmin Et Bakalım</h2>
+        <input type="text" id="nicknameInput" placeholder="Adınızı yazınız..." maxlength="15">
+
+        <div class="menu-buttons">
+            <button class="btn-create" onclick="odaKur()">Oyun Kur</button>
+            <button class="btn-join" onclick="odaSecimEkraniAc()">Oyuna Katıl</button>
+        </div>
+        <div id="joinSection" style="display:none; margin-top: 15px;">
+            <input type="text" id="roomCodeInput" placeholder="Oda Kodunu Girin..." style="margin-bottom:8px;">
+            <button class="btn-join" style="width:100%;" onclick="oyunaKatil()">Odaya Gir</button>
+        </div>
+    </div>
+
+    <!-- 2. BEKLEME LOBİSİ -->
+    <div id="lobbyScreen">
+        <h3>Bekleme Lobisi</h3>
+        <div class="room-code-display" id="displayRoomCode">Oda Kodu: -</div>
+
+        <div class="lobby-settings-box">
+            <label style="color:#aaa;">Tur Süresi:</label>
+            <select id="lobbyTurnTimeSelect" onchange="ayarGuncelle()">
+                <option value="30">30 Saniye</option>
+                <option value="60" selected>60 Saniye</option>
+                <option value="90">90 Saniye</option>
+            </select>
+
+            <label style="color:#aaa;">Oyun Kategorisi:</label>
+            <select id="lobbyCategorySelect" onchange="ayarGuncelle()">
+                <option value="karisik" selected>İkisi Karışık</option>
+                <option value="hayvanlar">Hayvanlar</option>
+                <option value="esyalar">Eşyalar</option>
+            </select>
+        </div>
+
+        <div class="lobby-player-list" id="lobbyPlayerList"></div>
+
+        <button class="lobby-action-btn" id="readyBtn" onclick="hazirDurumunuDegistir()">Hazır Ol ❌</button>
+        <button class="lobby-action-btn" id="startBtn" style="background: linear-gradient(135deg, #2ed573, #26af5f); display:none;" onclick="oyunuBaslatFirebase()">Oyunu Başlat</button>
+    </div>
+
+    <!-- 3. OYUN EKRANI -->
+    <div id="gameScreen">
+        <div class="scoreboard">
+            <h3>Skor Tablosu</h3>
+            <div id="playerList"></div>
+        </div>
+
+        <div class="game-area">
+            <div class="game-status-bar">
+                <span id="statusBar">Oyun Başlıyor...</span>
+                <span class="timer-box" id="timerText">60s</span>
+            </div>
+
+            <canvas id="drawingCanvas" width="480" height="360"></canvas>
+
+            <div class="tools-panel" id="toolsPanel">
+                <div class="color-palette">
+                    <div class="color-btn" style="background: #000000;" onclick="renkDegistir('#000000')"></div>
+                    <div class="color-btn" style="background: #ff4757;" onclick="renkDegistir('#ff4757')"></div>
+                    <div class="color-btn" style="background: #2ed573;" onclick="renkDegistir('#2ed573')"></div>
+                    <div class="color-btn" style="background: #1e90ff;" onclick="renkDegistir('#1e90ff')"></div>
+                    <div class="color-btn" style="background: #ffa500;" onclick="renkDegistir('#ffa500')"></div>
+                    <div class="color-btn" style="background: #9b59b6;" onclick="renkDegistir('#9b59b6')"></div>
+                </div>
+
+                <div class="tool-group">
+                    <label style="font-size: 12px; color: #aaa;">Boyut:</label>
+                    <input type="range" id="brushSize" min="1" max="20" value="4">
+                    <button class="eraser-btn" onclick="silgiSec()">Silgi</button>
+                    <button class="clear-btn" onclick="tuvaliTemizle(true)">Temizle</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-container">
+            <div class="chat-messages" id="chat_messages">
+                <div><strong>Sistem:</strong> Online odaya hoş geldin!</div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="chat_input" placeholder="Tahminini yaz...">
+                <button id="send_button">Gönder</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const kelimeListesi = {
+            hayvanlar: ["Kedi", "Köpek", "Aslan", "Kaplan", "Fil", "Zürafa", "Maymun", "Tavşan", "Kurbağa", "Kuş", "Balık", "İnek", "Koyun", "At", "Ayı"],
+            esyalar: ["Masa", "Sandalye", "Bilgisayar", "Telefon", "Kalem", "Bardak", "Saat", "Lamba", "Kitap", "Gözlük", "Televizyon", "Bıçak", "Çanta", "Anahtar", "Halı"],
+            karisik: ["Kedi", "Masa", "Aslan", "Bilgisayar", "Köpek", "Kalem", "Zürafa", "Bardak", "Fil", "Saat", "Telefon", "Tavşan", "Kitap", "Maymun", "Lamba"]
+        };
+
+        const firebaseConfig = {
+            databaseURL: "https://tahminetbakalm-default-rtdb.firebaseio.com/"
+        };
+
+        let db = null;
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.database();
+        } catch (e) {
+            console.error("Firebase yüklenirken hata:", e);
+        }
+
+        let oyuncuId = "user_" + Math.random().toString(36).substr(2, 9);
+        let benIsim = "";
+        let odaKodu = "";
+        let isHost = false;
+        let isReady = false;
+        let odaRef = null;
+        let sayacInterval = null;
+        let currentDrawerId = ""; 
+        let gizliKelime = "";
+        let aktifKategori = "karisik";
+
+        const menuScreen = document.getElementById('menuScreen');
+        const lobbyScreen = document.getElementById('lobbyScreen');
+        const gameScreen = document.getElementById('gameScreen');
+        const wordChoiceModal = document.getElementById('wordChoiceModal');
+        const wordBtn1 = document.getElementById('wordBtn1');
+        const wordBtn2 = document.getElementById('wordBtn2');
+        
+        const nicknameInput = document.getElementById('nicknameInput');
+        const lobbyTurnTimeSelect = document.getElementById('lobbyTurnTimeSelect');
+        const lobbyCategorySelect = document.getElementById('lobbyCategorySelect');
+        const joinSection = document.getElementById('joinSection');
+        const roomCodeInput = document.getElementById('roomCodeInput');
+        const displayRoomCode = document.getElementById('displayRoomCode');
+        const lobbyPlayerList = document.getElementById('lobbyPlayerList');
+        const readyBtn = document.getElementById('readyBtn');
+        const startBtn = document.getElementById('startBtn');
+
+        const chatMessages = document.getElementById('chat_messages');
+        const chatInput = document.getElementById('chat_input');
+        const sendButton = document.getElementById('send_button');
+        const statusBar = document.getElementById('statusBar');
+        const timerText = document.getElementById('timerText');
+        const playerListDiv = document.getElementById('playerList');
+        const toolsPanel = document.getElementById('toolsPanel');
+
+        function odaKur() {
+            try {
+                let isim = nicknameInput.value.trim();
+                if (isim === "") { alert("Lütfen adınızı yazınız!"); return; }
+                if (!db) { alert("Firebase veritabanı bağlantısı kurulamadı!"); return; }
+
+                benIsim = isim;
+                isHost = true;
+                odaKodu = "ODA-" + Math.floor(1000 + Math.random() * 9000);
+                odaRef = db.ref('rooms/' + odaKodu);
+
+                let ilkOyuncu = {
+                    id: oyuncuId,
+                    isim: benIsim,
+                    puan: 0,
+                    hazir: true
+                };
+
+                odaRef.set({
+                    settings: { time: 60, category: "karisik" },
+                    status: "lobby",
+                    players: { [oyuncuId]: ilkOyuncu }
+                }).then(() => {
+                    menuScreen.style.display = "none";
+                    lobbyScreen.style.display = "block";
+                    displayRoomCode.innerText = "Oda Kodu: " + odaKodu;
+                    readyBtn.style.display = "none";
+                    startBtn.style.display = "block";
+                    lobbyTurnTimeSelect.disabled = false;
+                    lobbyCategorySelect.disabled = false;
+
+                    dinleyicileriBaslat();
+                }).catch((error) => {
+                    alert("Oda kurulamadı! Hata: " + error.message);
+                });
+            } catch (err) {
+                alert("Oda Kur Hatası: " + err.message);
+            }
+        }
+
+        function odaSecimEkraniAc() {
+            try {
+                let isim = nicknameInput.value.trim();
+                if (isim === "") { alert("Lütfen önce adınızı yazınız!"); return; }
+                joinSection.style.display = "block";
+            } catch (err) {
+                alert("Hata: " + err.message);
+            }
+        }
+
+        function oyunaKatil() {
+            try {
+                let isim = nicknameInput.value.trim();
+                let kod = roomCodeInput.value.trim().toUpperCase();
+                if (isim === "" || kod === "") { alert("Adınızı ve oda kodunu eksiksiz yazın!"); return; }
+                if (!db) { alert("Firebase bağlantısı yok!"); return; }
+
+                benIsim = isim;
+                isHost = false;
+                odaKodu = kod;
+                odaRef = db.ref('rooms/' + kod);
+
+                odaRef.once('value', (snapshot) => {
+                    if (!snapshot.exists()) {
+                        alert("Böyle bir oda bulunamadı!");
+                        return;
+                    }
+
+                    let yeniOyuncu = {
+                        id: oyuncuId,
+                        isim: benIsim,
+                        puan: 0,
+                        hazir: false
+                    };
+
+                    db.ref('rooms/' + odaKodu + '/players/' + oyuncuId).set(yeniOyuncu).then(() => {
+                        menuScreen.style.display = "none";
+                        lobbyScreen.style.display = "block";
+                        displayRoomCode.innerText = "Oda Kodu: " + odaKodu;
+                        readyBtn.style.display = "block";
+                        startBtn.style.display = "none";
+                        lobbyTurnTimeSelect.disabled = true;
+                        lobbyCategorySelect.disabled = true;
+
+                        dinleyicileriBaslat();
+                    }).catch((error) => {
+                        alert("Odaya katılamadı: " + error.message);
+                    });
+                }).catch((error) => {
+                    alert("Oda aranırken hata: " + error.message);
+                });
+            } catch (err) {
+                alert("Katılma Hatası: " + err.message);
+            }
+        }
+
+        function ayarGuncelle() {
+            if (!isHost || !odaRef) return;
+            let time = parseInt(lobbyTurnTimeSelect.value);
+            let category = lobbyCategorySelect.value;
+            odaRef.child('settings').set({ time, category });
+        }
+
+        function hazirDurumunuDegistir() {
+            isReady = !isReady;
+            db.ref('rooms/' + odaKodu + '/players/' + oyuncuId + '/hazir').set(isReady);
+
+            if (isReady) {
+                readyBtn.innerText = "Hazırsın! ✔️";
+                readyBtn.style.background = "linear-gradient(135deg, #2ed573, #26af5f)";
+            } else {
+                readyBtn.innerText = "Hazır Ol ❌";
+                readyBtn.style.background = "linear-gradient(135deg, #ff9f43, #ff7675)";
+            }
+        }
+
+        function sureyiBaslat(saniye) {
+            let kalanSure = saniye;
+            timerText.innerText = kalanSure + "s";
+
+            if (sayacInterval) clearInterval(sayacInterval);
+
+            sayacInterval = setInterval(() => {
+                kalanSure--;
+                timerText.innerText = kalanSure + "s";
+
+                if (kalanSure <= 0) {
+                    clearInterval(sayacInterval);
+                    timerText.innerText = "0s";
+                    statusBar.innerText = "Süre bitti! Kelime: " + gizliKelime;
+                    
+                    if (isHost) {
+                        setTimeout(sonrakiTuraGec, 2000);
+                    }
+                }
+            }, 1000);
+        }
+
+        function dinleyicileriBaslat() {
+            odaRef.child('players').on('value', (snapshot) => {
+                let playersObj = snapshot.val() || {};
+                let oyuncuDizisi = Object.values(playersObj);
+
+                lobbyPlayerList.innerHTML = "";
+                playerListDiv.innerHTML = "";
+
+                oyuncuDizisi.forEach(o => {
+                    let divL = document.createElement('div');
+                    divL.className = "lobby-player-item";
+                    divL.innerHTML = `<span>${o.isim} ${o.id === oyuncuId ? '(Sen)' : ''}</span> <span class="${o.hazir ? 'ready-status-true' : 'ready-status-false'}">${o.hazir ? 'Hazır ✔️' : 'Bekliyor...'}</span>`;
+                    lobbyPlayerList.appendChild(divL);
+
+                    let divG = document.createElement('div');
+                    divG.className = "player-item";
+                    divG.innerHTML = `<span>${o.isim} ${o.id === oyuncuId ? '(Sen)' : ''}</span><span class="player-score">${o.puan} P</span>`;
+                    playerListDiv.appendChild(divG);
+                });
+            });
+
+            odaRef.child('settings').on('value', (snapshot) => {
+                let s = snapshot.val();
+                if (s) {
+                    aktifKategori = s.category || "karisik";
+                    if (!isHost) {
+                        lobbyTurnTimeSelect.value = s.time;
+                        lobbyCategorySelect.value = s.category;
+                    }
+                }
+            });
+
+            odaRef.child('currentWord').on('value', (snapshot) => {
+                gizliKelime = snapshot.val() || "";
+                if (gizliKelime) {
+                    wordChoiceModal.style.display = "none";
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    odaRef.child('players').once('value', (snap) => {
+                        let players = snap.val() || {};
+                        let drawer = players[currentDrawerId];
+                        if (drawer) {
+                            if (currentDrawerId === oyuncuId) {
+                                statusBar.innerText = "✏️ Çiziyorsun: " + gizliKelime;
+                                toolsPanel.style.display = "flex";
+                            } else {
+                                statusBar.innerText = "🔍 " + drawer.isim + " çiziyor! (" + gizliKelime.length + " harf)";
+                                toolsPanel.style.display = "none";
+                            }
+                        }
+                    });
+
+                    let secilenSure = parseInt(lobbyTurnTimeSelect.value) || 60;
+                    sureyiBaslat(secilenSure);
+                }
+            });
+
+            odaRef.child('drawerId').on('value', (snapshot) => {
+                currentDrawerId = snapshot.val();
+                if (currentDrawerId) {
+                    if (currentDrawerId === oyuncuId) {
+                        kelimeSecenekleriniSun();
+                    } else {
+                        wordChoiceModal.style.display = "none";
+                        statusBar.innerText = "Sıradaki oyuncu kelime seçiyor...";
+                    }
+                }
+            });
+
+            odaRef.child('status').on('value', (snapshot) => {
+                let status = snapshot.val();
+                if (status === "playing") {
+                    lobbyScreen.style.display = "none";
+                    gameScreen.style.display = "flex";
+                }
+            });
+
+            odaRef.child('draw').on('child_added', (snapshot) => {
+                let data = snapshot.val();
+                if (data && data.userId !== oyuncuId) {
+                    cizgiCiz(data.x0, data.y0, data.x1, data.y1, data.color, data.size, false);
+                }
+            });
+
+            odaRef.child('clearCanvas').on('value', (snapshot) => {
+                if (snapshot.val() === true) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            });
+
+            odaRef.child('chat').on('child_added', (snapshot) => {
+                let msg = snapshot.val();
+                let msgDiv = document.createElement('div');
+                msgDiv.innerHTML = `<strong>${msg.sender}:</strong> ${msg.text}`;
+                chatMessages.appendChild(msgDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            });
+        }
+
+        function oyunuBaslatFirebase() {
+            odaRef.once('value', (snapshot) => {
+                let data = snapshot.val() || {};
+                let players = data.players || {};
+                let playerIds = Object.keys(players);
+                let ilkCizen = playerIds[0] || oyuncuId;
+
+                odaRef.update({
+                    status: "playing",
+                    drawerId: ilkCizen,
+                    currentWord: "",
+                    draw: null 
+                });
+            });
+        }
+
+        function kelimeSecenekleriniSun() {
+            let liste = kelimeListesi[aktifKategori] || kelimeListesi["karisik"];
+            let index1 = Math.floor(Math.random() * liste.length);
+            let index2;
+            do {
+                index2 = Math.floor(Math.random() * liste.length);
+            } while (index2 === index1 && liste.length > 1);
+
+            wordBtn1.innerText = liste[index1];
+            wordBtn2.innerText = liste[index2];
+            wordChoiceModal.style.display = "flex";
+        }
+
+        function kelimeyiOnayla(secilenKelime) {
+            wordChoiceModal.style.display = "none";
+            odaRef.update({
+                currentWord: secilenKelime,
+                draw: null
+            });
+        }
+
+        function sonrakiTuraGec() {
+            odaRef.once('value', (snapshot) => {
+                let data = snapshot.val() || {};
+                let players = data.players || {};
+                let playerIds = Object.keys(players);
+                
+                let currentIndex = playerIds.indexOf(currentDrawerId);
+                let nextIndex = (currentIndex + 1) % playerIds.length;
+                let sonrakiCizen = playerIds[nextIndex];
+
+                odaRef.update({
+                    drawerId: sonrakiCizen,
+                    currentWord: "",
+                    draw: null 
+                });
+            });
+        }
+
+        // ÇİZİM VE KANVAS MANTIĞI
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+        const brushSizeInput = document.getElementById('brushSize');
+
+        let çiziyorMusun = false;
+        let aktifRenk = '#000000';
+
+        function renkDegistir(yeniRenk) { aktifRenk = yeniRenk; }
+        function silgiSec() { aktifRenk = '#ffffff'; }
+        
+        function tuvaliTemizle(sync = true) { 
+            if (oyuncuId !== currentDrawerId) return; 
+            ctx.clearRect(0, 0, canvas.width, canvas.height); 
+            if(sync && odaRef) {
+                odaRef.child('clearCanvas').set(true);
+                setTimeout(() => odaRef.child('clearCanvas').set(false), 200);
+            }
+        }
+
+        function fareKonumuAl(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: (e.clientX - rect.left) * (canvas.width / rect.width),
+                y: (e.clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        function cizgiCiz(x0, y0, x1, y1, color, size, sendToFirebase = true) {
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x1, y1);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = size;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            ctx.closePath();
+
+            if (sendToFirebase && odaRef) {
+                odaRef.child('draw').push({ x0, y0, x1, y1, color, size, userId: oyuncuId });
+            }
+        }
+
+        let eskiX = 0, eskiY = 0;
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (oyuncuId !== currentDrawerId || !gizliKelime) return; 
+            çiziyorMusun = true;
+            const pos = fareKonumuAl(e);
+            eskiX = pos.x;
+            eskiY = pos.y;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (oyuncuId !== currentDrawerId || !gizliKelime || !çiziyorMusun) return; 
+            const pos = fareKonumuAl(e);
+            cizgiCiz(eskiX, eskiY, pos.x, pos.y, aktifRenk, brushSizeInput.value, true);
+            eskiX = pos.x;
+            eskiY = pos.y;
+        });
+
+        canvas.addEventListener('mouseup', () => çiziyorMusun = false);
+        canvas.addEventListener('mouseleave', () => çiziyorMusun = false);
+
+        function mesajGonder() {
+            const metin = chatInput.value.trim();
+            if (metin === "" || !odaRef) return;
+
+            if (oyuncuId !== currentDrawerId && gizliKelime && metin.toLowerCase() === gizliKelime.toLowerCase()) {
+                odaRef.child('chat').push({
+                    sender: "🎉 TEBRİKLER",
+                    text: benIsim + " kelimeyi doğru bildi! Kelime: " + gizliKelime
+                });
+                
+                odaRef.child('players/' + oyuncuId + '/puan').once('value', (snap) => {
+                    let mevcutPuan = snap.val() || 0;
+                    odaRef.child('players/' + oyuncuId + '/puan').set(mevcutPuan + 10);
+                });
+
+                if (sayacInterval) clearInterval(sayacInterval);
+                setTimeout(sonrakiTuraGec, 2000);
+            } else {
+                odaRef.child('chat').push({
+                    sender: benIsim,
+                    text: metin
+                });
+            }
+
+            chatInput.value = "";
+        }
+
+        sendButton.addEventListener('click', mesajGonder);
+        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') mesajGonder(); });
+    </script>
+</body>
+</html>
